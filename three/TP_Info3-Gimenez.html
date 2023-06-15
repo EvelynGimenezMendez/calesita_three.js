@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<title>TP-Info3-Gimenez</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link rel=stylesheet href="css/base.css"/>
+	</head>
+
+	<body>
+		<!--Scripts three.js-->
+		<script src="js/Three.js"></script>
+		<script src="js/THREEx.FullScreen.js"></script>
+		<script src="js/THREEx.WindowResize.js"></script>
+		<!-- Botón para mostrar información de uso al usuario -->
+		<script src="js/jquery-1.9.1.js"></script>
+		<script src="js/jquery-ui.js"></script>
+		<link rel=stylesheet href="css/jquery-ui.css" />
+		<link rel=stylesheet href="css/info.css"/>
+		<script src="js/info.js"></script>
+		<div id="infoButton"></div>
+		<div id="infoBox" title="Información">
+			R/T:<br>Bajar o Subir velocidad de la calesita<br><br>
+			G:<br>Resetear la velocidad de la calesita<br><br>
+			WASD:<br>Para mover la camara<br><br>
+			Flechitas:<br>Para moverse en el escenario<br><br>
+			0/1:<br>Pausar o reproducir el video<br><br>
+		</div>
+		<div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
+
+		<script>
+			// Variables globales
+			var container, scene, camera, renderer, controls, stats;
+			var cube;
+			var rotación=0.01;
+
+            // Para leer acciones del teclado
+            window.addEventListener('keydown',doKeyDown,true);
+				var cam_zpos = 600.0;
+				var cam_xpos = 0.0;
+				var Pi = 3.1415926535;
+				var ang_rad = 0;
+				var up_down_ang = 0;
+
+            function doKeyDown(evt)
+			{
+                console.log("Tecla oprimida: "+evt.keyCode);
+                switch (evt.keyCode) {
+                    case 38:  /* Se aprieta flecha hacia arriba*/
+                        var dx = 70 * Math.sin(ang_rad);
+                        var dz = 70 * Math.cos(ang_rad);
+                        cam_zpos -= dz;
+                        cam_xpos -= dx;
+                        break;
+                    case 40:  /* Se aprieta flecha hacia abajo */
+                        var dx = 70 * Math.sin(ang_rad);
+                        var dz = 70 * Math.cos(ang_rad);
+                        cam_zpos += dz;
+                        cam_xpos += dx;
+                        break;
+                    case 37:  /* Se aprieta flecha a la izquierda */
+                        ang_rad += (5* Pi / 180);
+                        break;
+                    case 39:  /* Se aprieta flecha a la derecha */
+                        ang_rad -= (5* Pi / 180);
+                    break;
+                    case 87:  /* Se aprieta W */
+                    	camera.position.y += 3;
+                    break;
+                    case 83:  /* Se aprieta S */
+                        camera.position.y -= 3;
+                    break;
+                    case 65:  /* Se aprieta A */
+                       	var dx = 3 * Math.sin(ang_rad+(Pi/2));
+                        var dz = 3 * Math.cos(ang_rad+(Pi/2));
+                        cam_zpos -= dz;
+                        cam_xpos -= dx;
+                    break;
+                    case 68:  /* Se aprieta D*/
+                        var dx = 3 * Math.sin(ang_rad-(Pi/2));
+                        var dz = 3 * Math.cos(ang_rad-(Pi/2));
+                        cam_zpos -= dz;
+                        cam_xpos -= dx;
+                    break;
+					case 82:  /* Se aprieta R */
+						rotación-=0.001;
+                    break;
+                    case 84:  /* Se aprieta T */
+						rotación+= 0.01;
+                    break;
+					case 71:  /* Se aprieta G */
+						rotación= 0.01;
+                    break;
+                    case 48:  /* Se aprieta 0 */
+                    	video.pause();
+						video.currentTime = 0;
+                    break;
+                    case 49:  /* Se aprieta 1 */
+                    	video.play();
+                    break;
+                    case 50:  /* Se aprieta 2 */
+                    	video.pause();
+                    break;
+
+                }
+            }
+
+			//Funciones
+			// Escena
+			scene = new THREE.Scene();
+
+			// Camara
+			var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+			var VIEW_ANGLE = 45, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.1, FAR = 20000;
+			camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+			scene.add(camera);
+			camera.position.set(0,150,400);
+
+			// Renderizador
+			renderer = new THREE.WebGLRenderer( {antialias:true} );
+			renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+			container = document.getElementById( 'ThreeJS' );
+			container.appendChild( renderer.domElement );
+
+			//Luces
+			var light = new THREE.PointLight(0xcccccc,.4);
+			light.position.set(0,550,0);
+			scene.add(light);
+
+			var light2 = new THREE.PointLight(0xcccccc,.6);
+			light2.position.set(0,50,100);
+			scene.add(light2);
+
+			// Fondo de la escena
+			var imagePrefix = "images/nebula-";
+			var directions  = ["xpos", "xneg", "ypos", "yneg", "zpos", "zneg"];
+			var imageSuffix = ".png";
+			var skyGeometry = new THREE.CubeGeometry( 5000, 5000, 5000 );
+			var materialArray = [];
+			for (var i = 0; i < 6; i++)
+				materialArray.push( new THREE.MeshPhongMaterial({
+					map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+					side: THREE.BackSide
+				}));
+			var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+			var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+			scene.add( skyBox );
+			
+			//Video de fondo
+			// Se crea elemento de video
+			video = document.createElement( 'video' );
+			//Video en formato .ogv
+			video.src = "videos/musica.ogv";
+			video.load(); // Se carga el video
+			video.play();
+			//Se crea el lienzo
+			videoImage = document.createElement( 'canvas' );
+			videoImage.width = 600;
+			videoImage.height = 185;
+			videoImageContext = videoImage.getContext( '2d' );
+			// Color del lienzo si no hay video
+			videoImageContext.fillStyle = '#000000';
+			videoImageContext.fillRect( 0, 0, videoImage.width, videoImage.height );
+			videoTexture = new THREE.Texture( videoImage );
+			videoTexture.minFilter = THREE.LinearFilter;
+			videoTexture.magFilter = THREE.LinearFilter;
+			var movieMaterial = new THREE.MeshPhongMaterial( { map: videoTexture, overdraw: true, side:THREE.DoubleSide } );
+			// Tamaño de video, se escala según estos parametros
+			var movieGeometry = new THREE.PlaneGeometry( 1000, 400, 4, 4 );
+			//Posición z del video
+			var movieScreen = new THREE.Mesh( movieGeometry, movieMaterial );
+			movieScreen.position.set(0,200,0);
+			movieScreen.position.z -= 400;
+			scene.add(movieScreen);
+
+			//----------------------------------------------------------------------------
+			//---------Calesita 
+			//----------------------------------------------------------------------------
+
+			//Grupo para movimiento de la calesita
+			var grupo_calesita = new THREE.Object3D();
+
+			//Materiales para la calesita
+
+			var ruedaTexture = new THREE.ImageUtils.loadTexture( 'images/base.jpg' );
+			var ruedaMaterial = new THREE.MeshPhongMaterial( { map: ruedaTexture, side: THREE.DoubleSide } );
+
+			var rosaTexture = new THREE.ImageUtils.loadTexture( 'images/rose.jpg' );
+			var rosaMaterial = new THREE.MeshPhongMaterial( { map: rosaTexture, side: THREE.DoubleSide } );
+
+			var barraTexture = new THREE.ImageUtils.loadTexture( 'images/metal.jpg' );
+			var barraMaterial = new THREE.MeshPhongMaterial( { map: barraTexture, side: THREE.DoubleSide } );
+
+			var maderaTexture = new THREE.ImageUtils.loadTexture( 'images/wood.jpg' );
+			var maderaMaterial = new THREE.MeshPhongMaterial( { map: maderaTexture, side: THREE.DoubleSide } );
+
+			var blancoNTexture = new THREE.ImageUtils.loadTexture( 'images/porcelana.jpg' );
+			var blancoNMaterial = new THREE.MeshPhongMaterial( { map: blancoNTexture, side: THREE.DoubleSide } );
+
+			//Creación de formas para asientos de la calesita
+
+			////////////////////////////      
+			// Taza
+			////////////////////////////
+			var grupo_tazacompleta = new THREE.Object3D();
+
+			//Esfera a la mitad que representa la taza
+			var esfera_geom = new THREE.SphereGeometry( 40, 32, 16, 0, 2 * Math.PI, 0, Math.PI / 2 );
+			var esfera_mesh =  new THREE.Mesh(esfera_geom, maderaMaterial);
+			esfera_mesh.rotation.z += aRadianes(180);
+			esfera_mesh.position.y += 40;
+			esfera_mesh.castShadow = true;
+			esfera_mesh.receiveShadow = true;		
+			grupo_tazacompleta.add(esfera_mesh);
+
+			//Torus que representa soporte para agarrar la taza 
+			var aza_geom = new THREE.TorusGeometry( 10, 3, 8, 14,Math.PI * 1.2 );
+			var aza_mesh = new THREE.Mesh(aza_geom, maderaMaterial);
+			aza_mesh.castShadow = true;
+			aza_mesh.receiveShadow = true;
+			aza_mesh.rotation.z += aRadianes(110);
+			aza_mesh.position.y += 25;
+			aza_mesh.position.x -= 35;
+			grupo_tazacompleta.add(aza_mesh);	
+
+			//Posición de la taza
+			grupo_tazacompleta.position.x -= 180;
+			grupo_tazacompleta.position.z += 0;
+
+			//Movimiento de la silla arriba-abajo
+			var j = 0;
+			function anim(obj) //Para taza
+			{
+				obj.position.y += j;
+				if (obj.position.y > 55) 
+				{
+					obj.position.y -= 0.2;
+					j = -0.4;;
+				}
+				if (obj.position.y < 10) 
+				{
+					obj.position.y = 10;
+					j = 0.4;
+				}		
+			}
+
+			//Agregamos la taza a la escena y al grupo calesita
+			scene.add(grupo_tazacompleta);
+			grupo_calesita.add(grupo_tazacompleta);
+
+
+			////////////////////////////      
+			// Cohete
+			////////////////////////////
+			var grupo_cohete = new THREE.Object3D();
+
+			//Caja que representa asiento del cohete
+			//Abajo
+			var coheteabajo_geom = new THREE.CubeGeometry(50,3,30);
+			var coheteabajo_mesh = new THREE.Mesh(coheteabajo_geom, maderaMaterial);
+			coheteabajo_mesh.position.x-=10;
+			coheteabajo_mesh.position.y=20;
+			coheteabajo_mesh.castShadow = true;
+			coheteabajo_mesh.receiveShadow = true;
+			grupo_cohete.add(coheteabajo_mesh);
+			//Costado1
+			var costado1_geom = new THREE.CubeGeometry(50,20,3);
+			var costado1_mesh = new THREE.Mesh(costado1_geom, maderaMaterial);
+			costado1_mesh.position.x -= 10;
+			costado1_mesh.position.y = 30;
+			costado1_mesh.position.z -= 16;
+			costado1_mesh.castShadow = true;
+			costado1_mesh.receiveShadow = true;
+			grupo_cohete.add(costado1_mesh);
+			//Costado2
+			var costado2_geom = new THREE.CubeGeometry(50,20,3);
+			var costado2_mesh = new THREE.Mesh(costado2_geom, maderaMaterial);
+			costado2_mesh.position.x -= 10;
+			costado2_mesh.position.y = 30;
+			costado2_mesh.position.z += 16;
+			costado2_mesh.castShadow = true;
+			costado2_mesh.receiveShadow = true;
+			grupo_cohete.add(costado2_mesh);
+			//Atras
+			var coheteatras_geom = new THREE.CubeGeometry(30,20,4);
+			var coheteatras_mesh = new THREE.Mesh(coheteatras_geom, maderaMaterial);
+			coheteatras_mesh.position.x -= 34;
+			coheteatras_mesh.position.y = 30;
+			coheteatras_mesh.rotation.y = aRadianes(-90);
+			coheteatras_mesh.castShadow = true;
+			coheteatras_mesh.receiveShadow = true;
+			grupo_cohete.add(coheteatras_mesh);
+
+			//Cono que representa la punta del cohete
+			var cono_geom = new THREE.CylinderGeometry( 1, 23, 32, 32);
+			var cono_mesh =  new THREE.Mesh(cono_geom, maderaMaterial);
+			cono_mesh.position.x += 27;
+			cono_mesh.position.y = 30;
+			cono_mesh.rotation.z += aRadianes(-90);
+			cono_mesh.castShadow = true;
+			cono_mesh.receiveShadow = true;
+			grupo_cohete.add(cono_mesh);
+
+			//Posición del cohete
+			grupo_cohete.position.x = 120;
+			grupo_cohete.position.y -= 50;
+			grupo_cohete.position.z = 120;
+			grupo_cohete.rotation.y += aRadianes(30);
+			
+			var k=0;
+			function anim2(obj) //Para cohete
+			{
+				obj.position.y += k;
+				if (obj.position.y > 49) 
+				{
+					obj.position.y -= 0.2;
+					k = -0.4;;
+				}
+				if (obj.position.y < 10) 
+				{
+					obj.position.y = 10;
+					k = 0.4;
+				}		
+			}
+			//Agregamos el cohete a la escena y al grupo calesita
+			scene.add(grupo_cohete);
+			grupo_calesita.add(grupo_cohete);
+
+
+			////////////////////////////      
+			// Silla
+			////////////////////////////
+			var grupo_silla= new THREE.Object3D();
+
+			//Asiento de la silla
+			var asiento_geom = new THREE.CubeGeometry(70,3,35);
+			var asiento_mesh = new THREE.Mesh(asiento_geom, maderaMaterial);
+			asiento_mesh.castShadow= true;
+			asiento_mesh.receiveShadow = true;
+			asiento_mesh.position.y=20;
+			grupo_silla.add(asiento_mesh);
+
+			//Respaldo de la silla y pata trasera
+			var respaldo_geom = new THREE.CubeGeometry(70,50,3);
+			var respaldo_mesh = new THREE.Mesh(respaldo_geom, maderaMaterial);
+			respaldo_mesh.castShadow= true;
+			respaldo_mesh.receiveShadow = true;
+			respaldo_mesh.position.z -= 18;
+			respaldo_mesh.position.y = 30;
+			grupo_silla.add(respaldo_mesh);
+
+			//Pata de la silla delantera
+			var pata_geom = new THREE.CubeGeometry(70,20,3);
+			var pata_mesh = new THREE.Mesh(pata_geom, maderaMaterial);
+			pata_mesh.castShadow= true;
+			pata_mesh.receiveShadow = true;
+			pata_mesh.position.z += 18;
+			pata_mesh.position.y = 11;
+			grupo_silla.add(pata_mesh);
+
+			//Posición silla
+			grupo_silla.rotation.y += aRadianes(260);
+			grupo_silla.position.x = 70;
+			grupo_silla.position.z -= 170;
+
+			
+
+			//Movimiento de la silla arriba-abajo
+			var m=0;
+			function anim3(obj) //Para silla
+			{
+				obj.position.y += m;
+				if (obj.position.y > 50) 
+				{
+					obj.position.y -= 0.2;
+					m = -0.4;;
+				}
+				if (obj.position.y < 10) 
+				{
+					obj.position.y = 10;
+					m = 0.4;
+				}		
+			}
+			//Agregamos silla a la escena y al grupo calesita
+			scene.add(grupo_silla);
+			grupo_calesita.add(grupo_silla);
+				
+
+			////////////////////////////      
+			// Base de la calesita
+			////////////////////////////
+			var basecalesita_geom = new THREE.CylinderGeometry( 200, 230, 8, 100, 100 );
+			var basecalesita_mesh = new THREE.Mesh(basecalesita_geom,rosaMaterial);
+			basecalesita_mesh.castShadow = true;
+			basecalesita_mesh.receiveShadow = true;
+			grupo_calesita.add(basecalesita_mesh);
+
+			////////////////////////////      
+			// Techo de la calesita
+			////////////////////////////
+			var techocalesita_geom = new THREE.CylinderGeometry( 1, 210, 100, 100, 50 );
+			var techocalesita_mesh = new THREE.Mesh(techocalesita_geom,ruedaMaterial);
+			//Posición del techo
+			techocalesita_mesh.position.y += 200;
+			//Agregamos el techo al grupo calesita
+			grupo_calesita.add(techocalesita_mesh);
+
+			////////////////////////////      
+			// Parte lateral techo
+			////////////////////////////
+			var techo2_geom = new THREE.CylinderGeometry( 210, 210, 13, 100, 50,true );
+			var techo2_mesh = new THREE.Mesh(techo2_geom,rosaMaterial);
+			techo2_mesh.castShadow = true;
+			techo2_mesh.receiveShadow = true;
+			//Posición del techo lateral
+			techo2_mesh.position.x -= 0;
+			techo2_mesh.position.y += 145;
+			techo2_mesh.position.z += 0;
+			//Agregamos el techo2 al grupo calesita
+			grupo_calesita.add(techo2_mesh);
+
+			////////////////////////////      
+			// Barra del medio calesita
+			////////////////////////////
+			var medio_geom = new THREE.CylinderGeometry( 30, 30, 200, 100, 50 );
+			var mediocalesita_mesh = new THREE.Mesh(medio_geom,barraMaterial);
+			mediocalesita_mesh.castShadow = true;
+			mediocalesita_mesh.receiveShadow = true;
+			//Posición del medio
+			mediocalesita_mesh.position.x -= 0;
+			mediocalesita_mesh.position.y += 100;
+			mediocalesita_mesh.position.z += 0;
+			//Agregamos el medio al grupo calesita
+			grupo_calesita.add(mediocalesita_mesh);
+
+			
+			////////////////////////////      
+			// Barras calesita para asientos
+			////////////////////////////
+			var grupo_barras = new THREE.Object3D();
+			var barra_geom = new THREE.CylinderGeometry( 3, 3, 160, 100, 50);
+			var barra1_mesh = new THREE.Mesh(barra_geom,barraMaterial);
+			barra1_mesh.castShadow = true;
+			barra1_mesh.receiveShadow = true;
+			//Clonamos para la barra 2 y 3
+			var barra2 = barra1_mesh.clone();
+			var barra3 = barra1_mesh.clone();
+			//Agregamos las barras al grupo barras
+			grupo_barras.add(barra1_mesh)
+			grupo_barras.add(barra2)
+			grupo_barras.add(barra3)
+			//Acomodamos la posición de las barras
+			//Barra1
+			barra1_mesh.position.x -= 180;
+			barra1_mesh.position.y += 80;
+			barra1_mesh.position.z += 0;
+			//Barra2
+			barra2.position.x += 120;
+			barra2.position.y += 80;
+			barra2.position.z += 120;
+			//Barra3
+			barra3.position.x += 70;
+			barra3.position.y += 80;
+			barra3.position.z -= 170;
+			//Agregamos las barras al grupo calesita
+			grupo_calesita.add(grupo_barras);
+
+
+			//Acomodamos la calesita 
+			grupo_calesita.position.x -= 0;
+			grupo_calesita.position.z += 0;
+			grupo_calesita.position.y += 5;
+			
+			//Agregamos la calesita a la escena
+			scene.add(grupo_calesita);			
+	
+		//////////////////////////TERMINA LA CALESITA
+
+			//Luces y sombras
+			renderer.shadowMapEnabled = true;
+
+			//////////////////////////////////////////
+			// Luz taza
+			//////////////////////////////////////////
+			var luzTaza = new THREE.SpotLight(0xffcaff);
+			luzTaza.position.set(-180,150,0); //Posición barra1 - Taza
+			luzTaza.shadowCameraVisible = false;
+			luzTaza.shadowDarkness = 0.5;
+			luzTaza.intensity = 6;
+			luzTaza.castShadow = true;
+			scene.add(luzTaza);
+			//Donde apunta la luz
+			luzTaza.target = grupo_tazacompleta;
+			grupo_calesita.add(luzTaza);
+
+			//////////////////////////////////////////
+			// Luz cohete
+			//////////////////////////////////////////
+			var luzCohete = new THREE.SpotLight(0xffcaff);
+			luzCohete.position.set(120,150,120); //Posición barra2 - Cohete
+			luzCohete.shadowCameraVisible = false;
+			luzCohete.shadowDarkness = 0.5;
+			luzCohete.intensity = 6;
+			luzCohete.castShadow = true;
+			scene.add(luzCohete);
+			//Donde apunta la luz
+			luzCohete.target = grupo_cohete;
+			grupo_calesita.add(luzCohete);
+
+			//////////////////////////////////////////
+			// Luz silla
+			//////////////////////////////////////////
+			var luzSilla = new THREE.SpotLight(0xffcaff);
+			luzSilla.position.set(70,150,-170); //Posición barra3 - Silla
+			luzSilla.shadowCameraVisible = false;
+			luzSilla.shadowDarkness = 0.5;
+			luzSilla.intensity = 6;
+			luzSilla.castShadow = true;
+			scene.add(luzSilla);
+			// Donde apunta la luz
+			luzSilla.target = grupo_silla;
+			grupo_calesita.add(luzSilla);
+
+			/////////////////////////////////////////
+			//Focos
+			/////////////////////////////////////////
+			var grupo_focos = new THREE.Object3D();
+			//Esfera a la mitad que representa el foco
+			var foco1_geom = new THREE.SphereGeometry( 13, -5, 15, 0, 2 * Math.PI, 0, Math.PI / 2 );
+			var foco1_mesh =  new THREE.Mesh(foco1_geom, blancoNMaterial);
+			foco1_mesh.rotation.z += aRadianes(0);
+			foco1_mesh.position.y += 50;
+			//Clonamos para el foco 2 y 3
+			var foco2 = foco1_mesh.clone();
+			var foco3 = foco1_mesh.clone();
+			//Agregamos las barras al grupo barras
+			grupo_focos.add(foco1_mesh)
+			grupo_focos.add(foco2)
+			grupo_focos.add(foco3)
+			//Acomodamos la posición de las barras
+			//Barra1
+			foco1_mesh.position.x -= 180;
+			foco1_mesh.position.y += 80;
+			foco1_mesh.position.z += 0;
+			//Barra2
+			foco2.position.x += 120;
+			foco2.position.y += 80;
+			foco2.position.z += 120;
+			//Barra3
+			foco3.position.x += 70;
+			foco3.position.y += 80;
+			foco3.position.z -= 170;
+			//Agregamos las barras al grupo calesita
+			grupo_calesita.add(grupo_focos);
+
+			//******************************
+			//Luces del cielo
+			//******************************
+			//////////////////////////////////////////
+			// Luz amarilla en el cielo
+			//////////////////////////////////////////
+			var spotlight = new THREE.SpotLight(0xffff00);
+			spotlight.position.set(-300,450,-30);
+			spotlight.shadowCameraVisible = false;
+			spotlight.shadowDarkness = 0.95;
+			spotlight.intensity = 2;
+			// must enable shadow casting ability for the light
+			spotlight.castShadow = true;
+			scene.add(spotlight);
+			//cambiar la direccion en la que apunta
+			var lightTarget3 = new THREE.Object3D();
+			lightTarget3.position.set(-300,10,-30);
+			scene.add(lightTarget3);
+			spotlight.target = lightTarget3;
+
+			//////////////////////////////////////////
+			// Luz roja en el cielo
+			//////////////////////////////////////////
+			var spotlight2 = new THREE.SpotLight(0xff0000);
+			spotlight2.position.set(0,450,-100);
+			scene.add(spotlight2);
+			spotlight2.shadowCameraVisible = false;
+			spotlight2.shadowDarkness = 0.70;
+			spotlight2.intensity = 10;
+			spotlight2.castShadow = true;
+			//cambiar la direccion en la que apunta
+			var lightTarget2 = new THREE.Object3D();
+			lightTarget2.position.set(0,10,-100);
+			scene.add(lightTarget2);
+			spotlight2.target = lightTarget2;
+
+			//////////////////////////////////////////
+			// Luz azul en el cielo
+			//////////////////////////////////////////
+			var spotlight3 = new THREE.SpotLight(0x0000ff);
+			spotlight3.position.set(300,500,-100);
+			spotlight3.shadowCameraVisible = false;
+			spotlight3.shadowDarkness = 0.95;
+			spotlight3.intensity = 4;
+			spotlight3.castShadow = true;
+			scene.add(spotlight3);
+			// cambiar la direccion en la que apunta
+			var lightTarget = new THREE.Object3D();
+			lightTarget.position.set(300,10,-100);
+			scene.add(lightTarget);
+			lightTarget.position.z += 2;
+			spotlight3.target = lightTarget;
+
+			//////////////////////////////////////////
+			// Piso 
+			//////////////////////////////////////////
+			var floorTexture = new THREE.ImageUtils.loadTexture( 'images/pasto.jpg' );
+			floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+			floorTexture.repeat.set( 10, 10 );
+			var floorMaterial = new THREE.MeshLambertMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+			var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 100, 100);
+			var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+			floor.position.y = -0.5;
+			floor.rotation.x = Math.PI / 2;
+			// El piso recibe sombra
+			//floor.receiveShadow = true;
+			scene.add(floor);
+
+			//Varibles de ayuda para control de las luces
+			var arriba = true;
+			var arriba2 = true;
+			var arriba3 = true;
+
+			//Renderizado
+			var render = function()
+			{
+				if ( video.readyState === video.HAVE_ENOUGH_DATA )
+				{
+					videoImageContext.drawImage( video, 0, 0 );
+					if ( videoTexture )
+						videoTexture.needsUpdate = true;
+				}
+				
+				if(lightTarget3.position.z > 140)
+					arriba3 = false;
+				if(lightTarget3.position.z < -280)
+					arriba3 = true;
+
+				if(lightTarget2.position.z > 140)
+					arriba2 = false;
+				if(lightTarget2.position.z < -280)
+					arriba2 = true;
+
+				if(lightTarget.position.z > 30)
+					arriba = false;
+				if(lightTarget.position.z < -180)
+					arriba = true;
+
+				if(arriba)
+				{
+					lightTarget.position.z += 2.5;
+				}
+				else
+				{
+					lightTarget.position.z -= 2.5;
+				}
+
+				if(arriba2)
+				{
+					lightTarget2.position.z += 4;
+				}
+				else
+				{
+					lightTarget2.position.z -= 4;
+				}
+
+				if(arriba3)
+				{
+					lightTarget3.position.z += 3;
+				}
+				else
+				{
+					lightTarget3.position.z -= 3;
+				}
+
+				//Posición de la camara
+				camera.position.x = cam_xpos;
+				camera.position.z = cam_zpos;
+				camera.rotation.y = ang_rad;
+
+				//Velocidad de rotación default de las tazas
+				grupo_calesita.rotation.y += rotación;
+
+				//Movimiento arriba-abajo de los objetos
+				anim(grupo_tazacompleta)
+				anim2(grupo_cohete)
+				anim3(grupo_silla)
+
+				///////////////////////////////////////////////////////////////////////
+				requestAnimationFrame(render);
+				renderer.render( scene, camera );
+			}
+			render();
+
+			//Función para posicionar objetos en grados y radianes		
+			function aGrados(radianes)
+			{
+				return radianes * 180 / Math.PI;
+			}
+			function aRadianes(degrees) 
+			{
+				return degrees * Math.PI / 180;
+			}
+		</script>
+	</body>
+</html>
