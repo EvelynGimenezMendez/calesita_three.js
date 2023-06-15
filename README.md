@@ -1,6 +1,6 @@
 # Proyecto three.js
 ## Proyecto para la materia Informática 3
-- Evelyn Gimenez 
+### Evelyn Gimenez @ 2021
 
 Requisitos del proyecto: 
 
